@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+
+{% block title %}{{ dataset.name }} — DataLens{% endblock %}
+
+{% block content %}
+<div class="dataset-hub">
+    <header class="dataset-hub__hero">
+        <h1>{{ dataset.name }}</h1>
+        <p>{{ dataset.rows_count }} lignes × {{ dataset.columns_count }} colonnes</p>
+    </header>
+
+    <div class="action-grid">
+        <a href="{{ url_for('main.auto_ai_analysis', dataset_id=dataset.id) }}" class="action-tile action-tile--primary" data-loading-nav>
+            Rapport IA auto
+            <span>Analyse automatique après import</span>
+        </a>
+        <a href="{{ url_for('main.ai_report', dataset_id=dataset.id) }}" class="action-tile action-tile--report" data-loading-nav>
+            Rapport IA (types)
+            <span>Synthèse, exécutif ou qualité des données</span>
+        </a>
+        <a href="{{ url_for('main.ai_insights', dataset_id=dataset.id) }}" class="action-tile action-tile--insights" data-loading-nav>
+            Insights IA
+            <span>Vue d’ensemble, graphiques suggérés, chat</span>
+        </a>
+        <a href="{{ url_for('main.auto_dashboard', dataset_id=dataset.id) }}" class="action-tile action-tile--dash">
+            Auto dashboard
+            <span>Visualisations générées</span>
+        </a>
+        <a href="{{ url_for('main.analysis_dataset', dataset_id=dataset.id) }}" class="action-tile action-tile--analyze">
+            Analyse statistique
+            <span>Métriques et corrélations</span>
+        </a>
+        <a href="{{ url_for('main.visualize_dataset', dataset_id=dataset.id) }}" class="action-tile action-tile--viz">
+            Visualiser
+            <span>Créer des graphiques</span>
+        </a>
+    </div>
+
+    <section class="data-panel">
+        <h2>Aperçu des données</h2>
+        <div class="table-container">
+            <table class="data-table simple-table">
+                <thead>
+                    <tr>
+                        {% for column in preview[0].keys() %}
+                            <th>{{ column }}</th>
+                        {% endfor %}
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in preview %}
+                        <tr>
+                            {% for value in row.values() %}
+                                <td>{{ value if value is not none else '' }}</td>
+                            {% endfor %}
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% if dataset.rows_count > 10 %}
+        <p class="table-note">10 premières lignes sur {{ dataset.rows_count }}</p>
+        {% endif %}
+    </section>
+
+    <div class="hub-back">
+        <a href="{{ url_for('main.dashboard') }}" class="btn btn-ghost">← Tableau de bord</a>
+    </div>
+</div>
+{% endblock %}

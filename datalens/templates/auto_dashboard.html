@@ -1,0 +1,360 @@
+{% extends "base.html" %}
+
+{% block title %}Auto Dashboard - {{ dataset.name }} - DataLens{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="dataset-header">
+        <div class="dataset-title">
+            <h1>🚀 Auto Dashboard - {{ dataset.name }}</h1>
+            <p class="dataset-meta">
+                File: {{ dataset.filename }} • 
+                {{ dataset.rows_count }} rows × {{ dataset.columns_count }} columns
+            </p>
+        </div>
+        <div class="dataset-actions">
+            <a href="{{ url_for('main.visualize_dataset', dataset_id=dataset.id) }}" class="btn btn-secondary">📊 Custom Charts</a>
+            <a href="{{ url_for('main.analysis_dataset', dataset_id=dataset.id) }}" class="btn btn-secondary">🔍 Analysis</a>
+            <a href="{{ url_for('main.auto_dashboard_code', dataset_id=dataset.id) }}" class="btn btn-secondary">💻 Download Code (HTML)</a>
+            <a href="{{ url_for('main.view_dataset', dataset_id=dataset.id) }}" class="btn btn-secondary">View Data</a>
+            <a href="{{ url_for('main.dashboard') }}" class="btn btn-secondary">Dashboard</a>
+        </div>
+    </div>
+    
+    <!-- Summary Stats -->
+    <div class="summary-section">
+        <div class="summary-cards">
+            <div class="summary-card">
+                <div class="summary-icon">📊</div>
+                <div class="summary-content">
+                    <h3>{{ dashboard.summary_stats.dimensions }}</h3>
+                    <p>Dataset Size</p>
+                </div>
+            </div>
+            <div class="summary-card">
+                <div class="summary-icon">💾</div>
+                <div class="summary-content">
+                    <h3>{{ dashboard.summary_stats.memory_usage }}</h3>
+                    <p>Memory Usage</p>
+                </div>
+            </div>
+            <div class="summary-card">
+                <div class="summary-icon">🎯</div>
+                <div class="summary-content">
+                    <h3>{{ dashboard.summary_stats.quality_score }}%</h3>
+                    <p>Data Quality</p>
+                </div>
+            </div>
+            <div class="summary-card">
+                <div class="summary-icon">📈</div>
+                <div class="summary-content">
+                    <h3>{{ dashboard.charts|length }}</h3>
+                    <p>Auto Charts</p>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Auto Insights -->
+    {% if insights %}
+    <div class="insights-section">
+        <h2>💡 Auto Insights</h2>
+        <div class="insights-grid">
+            {% for insight in insights %}
+            <div class="insight-card">
+                <div class="insight-icon">{{ insight.icon }}</div>
+                <h3>{{ insight.title }}</h3>
+                <p>{{ insight.description }}</p>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+    
+    <!-- Auto Charts Grid -->
+    <div class="auto-dashboard">
+        <h2>📊 Auto-Generated Charts</h2>
+        <div class="charts-grid" id="chartsGrid">
+            {% for chart in dashboard.charts %}
+            <div class="chart-container" 
+                 data-chart-id="{{ chart.id }}"
+                 style="grid-row: {{ chart.position.row }} / span {{ chart.position.height }}; 
+                        grid-column: {{ chart.position.col }} / span {{ chart.position.width }};">
+                <div class="chart-card">
+                    <div class="chart-header">
+                        <h3>{{ chart.title }}</h3>
+                        <div class="chart-actions">
+                            <button class="btn btn-sm" onclick="refreshChart('{{ chart.id }}')" title="Refresh">
+                                🔄
+                            </button>
+                        </div>
+                    </div>
+                    <div class="chart-content" id="chart-{{ chart.id }}">
+                        <div class="chart-loading">
+                            <div class="spinner"></div>
+                            <p>Loading chart...</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    
+    <!-- Data Quality Assessment -->
+    <div class="quality-section">
+        <h2>🔍 Data Quality Assessment</h2>
+        <div class="quality-content">
+            <div class="quality-overview">
+                <div class="quality-score">
+                    <span class="score-label">Overall Quality:</span>
+                    <span class="score-value {{ dashboard.data_quality.overall_quality.lower().replace(' ', '-') }}">
+                        {{ dashboard.data_quality.overall_quality }}
+                    </span>
+                </div>
+            </div>
+            
+            {% if dashboard.data_quality.issues %}
+            <div class="quality-issues">
+                <h3>⚠️ Issues Found</h3>
+                <ul>
+                    {% for issue in dashboard.data_quality.issues %}
+                    <li>{{ issue }}</li>
+                    {% endfor %}
+                </ul>
+            </div>
+            {% endif %}
+            
+            {% if dashboard.data_quality.recommendations %}
+            <div class="quality-recommendations">
+                <h3>💡 Recommendations</h3>
+                <ul>
+                    {% for rec in dashboard.data_quality.recommendations %}
+                    <li>{{ rec }}</li>
+                    {% endfor %}
+                </ul>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+const datasetId = {{ dataset.id }};
+const charts = {{ dashboard.charts|tojson }};
+let chartInstances = {};
+
+// Initialize dashboard
+document.addEventListener('DOMContentLoaded', function() {
+    loadAllCharts();
+});
+
+function loadAllCharts() {
+    charts.forEach(chart => {
+        loadChart(chart.id);
+    });
+}
+
+function loadChart(chartId) {
+    const chartElement = document.getElementById(`chart-${chartId}`);
+    if (!chartElement) return;
+    
+    // Show loading
+    chartElement.innerHTML = `
+        <div class="chart-loading">
+            <div class="spinner"></div>
+            <p>Loading chart...</p>
+        </div>
+    `;
+    
+    // Fetch chart data
+    fetch(`/dataset/${datasetId}/auto_chart_data?chart_id=${chartId}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.error) {
+                chartElement.innerHTML = `<div class="chart-error">Error: ${data.error}</div>`;
+                return;
+            }
+            
+            renderChart(chartId, data);
+        })
+        .catch(error => {
+            console.error('Error loading chart:', error);
+            chartElement.innerHTML = `<div class="chart-error">Failed to load chart</div>`;
+        });
+}
+
+function renderChart(chartId, data) {
+    const chartElement = document.getElementById(`chart-${chartId}`);
+    const chart = charts.find(c => c.id === chartId);
+    
+    if (!chart || !chartElement) return;
+    
+    // Destroy existing chart instance
+    if (chartInstances[chartId]) {
+        chartInstances[chartId].destroy();
+    }
+    
+    // Handle different chart types
+    if (chart.type === 'summary') {
+        renderSummaryChart(chartElement, data);
+        return;
+    }
+    
+    // Create canvas for Chart.js
+    chartElement.innerHTML = '<canvas></canvas>';
+    const ctx = chartElement.querySelector('canvas').getContext('2d');
+    
+    let chartConfig = {
+        type: chart.type === 'histogram' ? 'bar' : chart.type,
+        data: {},
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    display: chart.type === 'pie'
+                }
+            }
+        }
+    };
+    
+    // Configure chart based on type
+    if (chart.type === 'scatter') {
+        chartConfig.data = {
+            datasets: data.datasets
+        };
+        chartConfig.options.scales = {
+            x: {
+                type: 'linear',
+                position: 'bottom'
+            },
+            y: {
+                beginAtZero: true
+            }
+        };
+    } else if (chart.type === 'pie') {
+        chartConfig.data = {
+            labels: data.labels,
+            datasets: [{
+                data: data.data,
+                backgroundColor: [
+                    '#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0',
+                    '#9966FF', '#FF9F40', '#FF6384', '#C9CBCF'
+                ]
+            }]
+        };
+    } else if (chart.type === 'heatmap') {
+        renderHeatmap(chartElement, data);
+        return;
+    } else if (chart.type === 'boxplot') {
+        renderBoxPlot(chartElement, data);
+        return;
+    } else {
+        chartConfig.data = {
+            labels: data.labels,
+            datasets: [{
+                label: 'Data',
+                data: data.data,
+                backgroundColor: 'rgba(54, 162, 235, 0.6)',
+                borderColor: 'rgba(54, 162, 235, 1)',
+                borderWidth: 2
+            }]
+        };
+        
+        if (chart.type !== 'histogram') {
+            chartConfig.options.scales = {
+                y: {
+                    beginAtZero: true
+                }
+            };
+        }
+    }
+    
+    chartInstances[chartId] = new Chart(ctx, chartConfig);
+}
+
+function renderSummaryChart(element, data) {
+    element.innerHTML = `
+        <div class="summary-chart">
+            <div class="summary-item">
+                <span class="summary-label">Total Rows:</span>
+                <span class="summary-value">${data.total_rows.toLocaleString()}</span>
+            </div>
+            <div class="summary-item">
+                <span class="summary-label">Total Columns:</span>
+                <span class="summary-value">${data.total_columns}</span>
+            </div>
+            <div class="summary-item">
+                <span class="summary-label">Numeric Columns:</span>
+                <span class="summary-value">${data.numeric_columns}</span>
+            </div>
+            <div class="summary-item">
+                <span class="summary-label">Categorical Columns:</span>
+                <span class="summary-value">${data.categorical_columns}</span>
+            </div>
+            <div class="summary-item">
+                <span class="summary-label">Missing Values:</span>
+                <span class="summary-value">${data.missing_values}</span>
+            </div>
+            <div class="summary-item">
+                <span class="summary-label">Memory Usage:</span>
+                <span class="summary-value">${data.memory_usage}</span>
+            </div>
+        </div>
+    `;
+}
+
+function renderHeatmap(element, data) {
+    element.innerHTML = `
+        <div class="heatmap-container">
+            <div class="heatmap-grid">
+                ${data.labels.map((label, i) => `
+                    <div class="heatmap-row">
+                        <div class="heatmap-label">${label}</div>
+                        ${data.labels.map((label2, j) => {
+                            const value = data.data.find(d => d.x === j && d.y === i);
+                            const color = getHeatmapColor(value ? value.v : 0);
+                            return `<div class="heatmap-cell" style="background-color: ${color}" title="${label} vs ${label2}: ${value ? value.v.toFixed(3) : 'N/A'}">${value ? value.v.toFixed(2) : ''}</div>`;
+                        }).join('')}
+                    </div>
+                `).join('')}
+            </div>
+        </div>
+    `;
+}
+
+function renderBoxPlot(element, data) {
+    element.innerHTML = `
+        <div class="boxplot-container">
+            <div class="boxplot-stats">
+                <p><strong>Min:</strong> ${data.min.toFixed(2)}</p>
+                <p><strong>Q1:</strong> ${data.q1.toFixed(2)}</p>
+                <p><strong>Median:</strong> ${data.median.toFixed(2)}</p>
+                <p><strong>Q3:</strong> ${data.q3.toFixed(2)}</p>
+                <p><strong>Max:</strong> ${data.max.toFixed(2)}</p>
+                <p><strong>Outliers:</strong> ${data.outliers.length}</p>
+            </div>
+        </div>
+    `;
+}
+
+function getHeatmapColor(value) {
+    if (value < 0) {
+        const intensity = Math.abs(value);
+        return `rgba(54, 162, 235, ${intensity})`;
+    } else {
+        const intensity = value;
+        return `rgba(255, 99, 132, ${intensity})`;
+    }
+}
+
+function refreshChart(chartId) {
+    loadChart(chartId);
+}
+</script>
+
+{% endblock %}

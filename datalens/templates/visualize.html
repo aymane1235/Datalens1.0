@@ -1,0 +1,549 @@
+{% extends "base.html" %}
+
+{% block title %}Visualize {{ dataset.name }} - DataLens{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="dataset-header">
+        <div class="dataset-title">
+            <h1>Visualize {{ dataset.name }}</h1>
+            <p class="dataset-meta">
+                File: {{ dataset.filename }} • 
+                {{ dataset.rows_count }} rows × {{ dataset.columns_count }} columns
+            </p>
+        </div>
+        <div class="dataset-actions">
+            <a href="{{ url_for('main.analysis_dataset', dataset_id=dataset.id) }}" class="btn btn-primary">🔍 Advanced Analysis</a>
+            <a href="{{ url_for('main.view_dataset', dataset_id=dataset.id) }}" class="btn btn-secondary">Back to Dataset</a>
+            <a href="{{ url_for('main.dashboard') }}" class="btn btn-secondary">Dashboard</a>
+        </div>
+    </div>
+    
+    <!-- Chart Builder Section -->
+    <div class="chart-builder">
+        <h2>Build Your Chart</h2>
+        <div class="chart-controls">
+            <div class="control-group">
+                <label for="chartType" class="form-label">Chart Type</label>
+                <select id="chartType" class="form-control">
+                    <option value="">Select chart type</option>
+                    <option value="bar">Bar Chart</option>
+                    <option value="line">Line Chart</option>
+                    <option value="pie">Pie Chart</option>
+                    <option value="scatter">Scatter Plot</option>
+                    <option value="histogram">Histogram</option>
+                    <option value="combined">Combined Bar + Line</option>
+                    <option value="heatmap">Correlation Heatmap</option>
+                    <option value="boxplot">Box Plot</option>
+                </select>
+            </div>
+            
+            <div class="control-group">
+                <label for="xColumn" class="form-label">X-Axis Column</label>
+                <select id="xColumn" class="form-control">
+                    <option value="">Select column</option>
+                </select>
+            </div>
+            
+            <div class="control-group">
+                <label for="yColumn" class="form-label">Y-Axis Column</label>
+                <select id="yColumn" class="form-control">
+                    <option value="">Select column</option>
+                </select>
+            </div>
+            
+            <div class="control-group">
+                <label for="barColumn" class="form-label">Bar Column (for Combined)</label>
+                <select id="barColumn" class="form-control">
+                    <option value="">Select column</option>
+                </select>
+            </div>
+            
+            <div class="control-group">
+                <label for="lineColumn" class="form-label">Line Column (for Combined)</label>
+                <select id="lineColumn" class="form-control">
+                    <option value="">Select column</option>
+                </select>
+            </div>
+            
+            <div class="control-group">
+                <label for="categoryColumn" class="form-label">Category Column (for Pie Chart)</label>
+                <select id="categoryColumn" class="form-control">
+                    <option value="">Select column</option>
+                </select>
+            </div>
+            
+            <div class="control-group">
+                <button id="generateChart" class="btn btn-primary">Generate Chart</button>
+                <button id="clearChart" class="btn btn-secondary">Clear</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Chart Display Section -->
+    <div class="chart-display">
+        <div class="chart-container">
+            <canvas id="mainChart"></canvas>
+        </div>
+        <div id="chartInfo" class="chart-info" style="display: none;">
+            <h3>Chart Information</h3>
+            <div id="chartDetails"></div>
+        </div>
+    </div>
+    
+    <!-- Suggested Charts Section -->
+    {% if suggested_charts %}
+    <div class="suggested-charts">
+        <h2>Suggested Charts</h2>
+        <div class="suggestions-grid">
+            {% for suggestion in suggested_charts %}
+            <div class="suggestion-card" data-chart-type="{{ suggestion.type }}" 
+                 {% if suggestion.x_column %}data-x-column="{{ suggestion.x_column }}"{% endif %}
+                 {% if suggestion.y_column %}data-y-column="{{ suggestion.y_column }}"{% endif %}
+                 {% if suggestion.column %}data-column="{{ suggestion.column }}"{% endif %}>
+                <div class="suggestion-icon">
+                    {% if suggestion.type == 'bar' %}📊{% endif %}
+                    {% if suggestion.type == 'line' %}📈{% endif %}
+                    {% if suggestion.type == 'pie' %}🥧{% endif %}
+                    {% if suggestion.type == 'scatter' %}⚡{% endif %}
+                    {% if suggestion.type == 'histogram' %}📉{% endif %}
+                </div>
+                <h3>{{ suggestion.title }}</h3>
+                <p>{{ suggestion.description }}</p>
+                <button class="btn btn-primary btn-sm create-suggestion">Create Chart</button>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+    
+    <!-- Column Information -->
+    <div class="column-info-section">
+        <h2>Available Columns</h2>
+        <div class="column-types">
+            {% if numeric_columns %}
+            <div class="column-group">
+                <h3>Numeric Columns</h3>
+                <div class="column-list">
+                    {% for col in numeric_columns %}
+                    <span class="column-tag numeric">{{ col }}</span>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+            
+            {% if categorical_columns %}
+            <div class="column-group">
+                <h3>Categorical Columns</h3>
+                <div class="column-list">
+                    {% for col in categorical_columns %}
+                    <span class="column-tag categorical">{{ col }}</span>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+            
+            {% if datetime_columns %}
+            <div class="column-group">
+                <h3>Datetime Columns</h3>
+                <div class="column-list">
+                    {% for col in datetime_columns %}
+                    <span class="column-tag datetime">{{ col }}</span>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+const datasetId = {{ dataset.id }};
+let currentChart = null;
+
+// Column data from server
+const numericColumns = {{ numeric_columns|tojson }};
+const categoricalColumns = {{ categorical_columns|tojson }};
+const datetimeColumns = {{ datetime_columns|tojson }};
+
+// Initialize chart type selector
+document.addEventListener('DOMContentLoaded', function() {
+    const chartTypeSelect = document.getElementById('chartType');
+    const xColumnSelect = document.getElementById('xColumn');
+    const yColumnSelect = document.getElementById('yColumn');
+    const barColumnSelect = document.getElementById('barColumn');
+    const lineColumnSelect = document.getElementById('lineColumn');
+    const categoryColumnSelect = document.getElementById('categoryColumn');
+    
+    // Populate column selectors
+    function populateColumnSelectors() {
+        // Clear existing options
+        xColumnSelect.innerHTML = '<option value="">Select column</option>';
+        yColumnSelect.innerHTML = '<option value="">Select column</option>';
+        barColumnSelect.innerHTML = '<option value="">Select column</option>';
+        lineColumnSelect.innerHTML = '<option value="">Select column</option>';
+        categoryColumnSelect.innerHTML = '<option value="">Select column</option>';
+        
+        // Add numeric columns to all selectors
+        numericColumns.forEach(col => {
+            xColumnSelect.innerHTML += `<option value="${col}">${col}</option>`;
+            yColumnSelect.innerHTML += `<option value="${col}">${col}</option>`;
+            barColumnSelect.innerHTML += `<option value="${col}">${col}</option>`;
+            lineColumnSelect.innerHTML += `<option value="${col}">${col}</option>`;
+        });
+        
+        // Add categorical columns to X and category selectors
+        categoricalColumns.forEach(col => {
+            xColumnSelect.innerHTML += `<option value="${col}">${col}</option>`;
+            categoryColumnSelect.innerHTML += `<option value="${col}">${col}</option>`;
+        });
+        
+        // Add datetime columns to X selector
+        datetimeColumns.forEach(col => {
+            xColumnSelect.innerHTML += `<option value="${col}">${col}</option>`;
+        });
+    }
+    
+    // Handle chart type change
+    chartTypeSelect.addEventListener('change', function() {
+        const chartType = this.value;
+        
+        // Hide all column selectors first
+        document.getElementById('xColumn').parentElement.style.display = 'none';
+        document.getElementById('yColumn').parentElement.style.display = 'none';
+        document.getElementById('barColumn').parentElement.style.display = 'none';
+        document.getElementById('lineColumn').parentElement.style.display = 'none';
+        document.getElementById('categoryColumn').parentElement.style.display = 'none';
+        
+        // Show relevant selectors based on chart type
+        if (chartType === 'pie') {
+            document.getElementById('categoryColumn').parentElement.style.display = 'block';
+        } else if (chartType === 'histogram') {
+            document.getElementById('xColumn').parentElement.style.display = 'block';
+        } else if (chartType === 'boxplot') {
+            document.getElementById('xColumn').parentElement.style.display = 'block';
+        } else if (chartType === 'heatmap') {
+            // Heatmap doesn't need column selection
+        } else if (chartType === 'combined') {
+            document.getElementById('xColumn').parentElement.style.display = 'block';
+            document.getElementById('barColumn').parentElement.style.display = 'block';
+            document.getElementById('lineColumn').parentElement.style.display = 'block';
+        } else if (chartType) {
+            document.getElementById('xColumn').parentElement.style.display = 'block';
+            document.getElementById('yColumn').parentElement.style.display = 'block';
+        }
+    });
+    
+    // Generate chart button
+    document.getElementById('generateChart').addEventListener('click', generateChart);
+    
+    // Clear chart button
+    document.getElementById('clearChart').addEventListener('click', clearChart);
+    
+    // Suggested chart buttons
+    document.querySelectorAll('.create-suggestion').forEach(button => {
+        button.addEventListener('click', function() {
+            const card = this.closest('.suggestion-card');
+            const chartType = card.dataset.chartType;
+            const xColumn = card.dataset.xColumn;
+            const yColumn = card.dataset.yColumn;
+            const column = card.dataset.column;
+            
+            // Set form values
+            chartTypeSelect.value = chartType;
+            chartTypeSelect.dispatchEvent(new Event('change'));
+            
+            if (xColumn) {
+                xColumnSelect.value = xColumn;
+            }
+            if (yColumn) {
+                yColumnSelect.value = yColumn;
+            }
+            if (column) {
+                categoryColumnSelect.value = column;
+            }
+            
+            // Generate chart
+            generateChart();
+        });
+    });
+    
+    populateColumnSelectors();
+});
+
+function generateChart() {
+    const chartType = document.getElementById('chartType').value;
+    const xColumn = document.getElementById('xColumn').value;
+    const yColumn = document.getElementById('yColumn').value;
+    const barColumn = document.getElementById('barColumn').value;
+    const lineColumn = document.getElementById('lineColumn').value;
+    const categoryColumn = document.getElementById('categoryColumn').value;
+    
+    if (!chartType) {
+        alert('Please select a chart type');
+        return;
+    }
+    
+    // Validate required fields based on chart type
+    if (chartType === 'combined' && (!xColumn || !barColumn || !lineColumn)) {
+        alert('Combined charts require X, Bar, and Line columns');
+        return;
+    }
+    
+    if (chartType === 'pie' && !categoryColumn) {
+        alert('Pie charts require a category column');
+        return;
+    }
+    
+    if ((chartType === 'bar' || chartType === 'line' || chartType === 'scatter') && (!xColumn || !yColumn)) {
+        alert('This chart type requires both X and Y columns');
+        return;
+    }
+    
+    if ((chartType === 'histogram' || chartType === 'boxplot') && !xColumn) {
+        alert('This chart type requires a column');
+        return;
+    }
+    
+    // Build URL parameters
+    let url = `/dataset/${datasetId}/chart_data?type=${chartType}`;
+    
+    if (xColumn) url += `&x_column=${xColumn}`;
+    if (yColumn) url += `&y_column=${yColumn}`;
+    if (barColumn) url += `&bar_column=${barColumn}`;
+    if (lineColumn) url += `&line_column=${lineColumn}`;
+    if (categoryColumn) url += `&column=${categoryColumn}`;
+    
+    // Fetch chart data
+    fetch(url)
+        .then(response => response.json())
+        .then(data => {
+            if (data.error) {
+                alert('Error: ' + data.error);
+                return;
+            }
+            
+            createChart(data, chartType);
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Error generating chart');
+        });
+}
+
+function createChart(data, chartType) {
+    const ctx = document.getElementById('mainChart').getContext('2d');
+    
+    // Destroy existing chart
+    if (currentChart) {
+        currentChart.destroy();
+    }
+    
+    let chartConfig = {
+        type: chartType === 'histogram' ? 'bar' : chartType,
+        data: {},
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    display: chartType === 'pie' || chartType === 'combined'
+                },
+                title: {
+                    display: true,
+                    text: `${chartType.charAt(0).toUpperCase() + chartType.slice(1)} Chart`
+                }
+            }
+        }
+    };
+    
+    if (chartType === 'combined') {
+        chartConfig.data = {
+            labels: data.labels,
+            datasets: data.datasets
+        };
+        chartConfig.options.scales = {
+            y: {
+                type: 'linear',
+                display: true,
+                position: 'left',
+                title: {
+                    display: true,
+                    text: data.datasets[0].label
+                }
+            },
+            y1: {
+                type: 'linear',
+                display: true,
+                position: 'right',
+                title: {
+                    display: true,
+                    text: data.datasets[1].label
+                },
+                grid: {
+                    drawOnChartArea: false,
+                },
+            }
+        };
+    } else if (chartType === 'heatmap') {
+        // Special handling for heatmap
+        createHeatmap(data);
+        return;
+    } else if (chartType === 'boxplot') {
+        // Special handling for box plot
+        createBoxPlot(data);
+        return;
+    } else if (chartType === 'scatter') {
+        chartConfig.data = {
+            datasets: data.datasets
+        };
+        chartConfig.options.scales = {
+            x: {
+                type: 'linear',
+                position: 'bottom'
+            },
+            y: {
+                beginAtZero: true
+            }
+        };
+    } else if (chartType === 'pie') {
+        chartConfig.data = {
+            labels: data.labels,
+            datasets: [{
+                data: data.data,
+                backgroundColor: [
+                    '#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0',
+                    '#9966FF', '#FF9F40', '#FF6384', '#C9CBCF'
+                ]
+            }]
+        };
+    } else {
+        chartConfig.data = {
+            labels: data.labels,
+            datasets: [{
+                label: 'Data',
+                data: data.data,
+                backgroundColor: chartType === 'line' ? 'rgba(54, 162, 235, 0.2)' : 'rgba(54, 162, 235, 0.6)',
+                borderColor: 'rgba(54, 162, 235, 1)',
+                borderWidth: 2,
+                fill: chartType === 'line'
+            }]
+        };
+        
+        if (chartType !== 'histogram') {
+            chartConfig.options.scales = {
+                y: {
+                    beginAtZero: true
+                }
+            };
+        }
+    }
+    
+    currentChart = new Chart(ctx, chartConfig);
+    
+    // Show chart info
+    document.getElementById('chartInfo').style.display = 'block';
+    document.getElementById('chartDetails').innerHTML = `
+        <p><strong>Chart Type:</strong> ${chartType}</p>
+        <p><strong>Data Points:</strong> ${data.data ? data.data.length : (data.datasets ? data.datasets[0].data.length : 0)}</p>
+        ${data.labels ? `<p><strong>Categories:</strong> ${data.labels.length}</p>` : ''}
+    `;
+}
+
+function createHeatmap(data) {
+    // Simple heatmap implementation using colored divs
+    const container = document.querySelector('.chart-container');
+    container.innerHTML = `
+        <div class="heatmap-container">
+            <h3>Correlation Heatmap</h3>
+            <div class="heatmap-grid">
+                ${data.labels.map((label, i) => `
+                    <div class="heatmap-row">
+                        <div class="heatmap-label">${label}</div>
+                        ${data.labels.map((label2, j) => {
+                            const value = data.data.find(d => d.x === j && d.y === i);
+                            const color = getHeatmapColor(value ? value.v : 0);
+                            return `<div class="heatmap-cell" style="background-color: ${color}" title="${label} vs ${label2}: ${value ? value.v.toFixed(3) : 'N/A'}">${value ? value.v.toFixed(2) : ''}</div>`;
+                        }).join('')}
+                    </div>
+                `).join('')}
+            </div>
+        </div>
+    `;
+    
+    document.getElementById('chartInfo').style.display = 'block';
+    document.getElementById('chartDetails').innerHTML = `
+        <p><strong>Chart Type:</strong> Heatmap</p>
+        <p><strong>Variables:</strong> ${data.labels.length}</p>
+        <p><strong>Correlations:</strong> ${data.data.length}</p>
+    `;
+}
+
+function createBoxPlot(data) {
+    // Simple box plot implementation
+    const container = document.querySelector('.chart-container');
+    container.innerHTML = `
+        <div class="boxplot-container">
+            <h3>Box Plot</h3>
+            <div class="boxplot-visualization">
+                <div class="boxplot-box">
+                    <div class="boxplot-whisker" style="bottom: 0%; height: ${((data.q1 - data.min) / (data.max - data.min)) * 100}%"></div>
+                    <div class="boxplot-box-main" style="bottom: ${((data.q1 - data.min) / (data.max - data.min)) * 100}%; height: ${((data.q3 - data.q1) / (data.max - data.min)) * 100}%"></div>
+                    <div class="boxplot-median" style="bottom: ${((data.median - data.min) / (data.max - data.min)) * 100}%"></div>
+                    <div class="boxplot-whisker" style="bottom: ${((data.q3 - data.min) / (data.max - data.min)) * 100}%; height: ${((data.max - data.q3) / (data.max - data.min)) * 100}%"></div>
+                </div>
+            </div>
+            <div class="boxplot-stats">
+                <p><strong>Min:</strong> ${data.min.toFixed(2)}</p>
+                <p><strong>Q1:</strong> ${data.q1.toFixed(2)}</p>
+                <p><strong>Median:</strong> ${data.median.toFixed(2)}</p>
+                <p><strong>Q3:</strong> ${data.q3.toFixed(2)}</p>
+                <p><strong>Max:</strong> ${data.max.toFixed(2)}</p>
+                <p><strong>Outliers:</strong> ${data.outliers.length}</p>
+            </div>
+        </div>
+    `;
+    
+    document.getElementById('chartInfo').style.display = 'block';
+    document.getElementById('chartDetails').innerHTML = `
+        <p><strong>Chart Type:</strong> Box Plot</p>
+        <p><strong>Min:</strong> ${data.min.toFixed(2)}</p>
+        <p><strong>Max:</strong> ${data.max.toFixed(2)}</p>
+        <p><strong>Outliers:</strong> ${data.outliers.length}</p>
+    `;
+}
+
+function getHeatmapColor(value) {
+    // Color scale from blue (negative) to red (positive)
+    if (value < 0) {
+        const intensity = Math.abs(value);
+        return `rgba(54, 162, 235, ${intensity})`;
+    } else {
+        const intensity = value;
+        return `rgba(255, 99, 132, ${intensity})`;
+    }
+}
+
+function clearChart() {
+    if (currentChart) {
+        currentChart.destroy();
+        currentChart = null;
+    }
+    
+    // Reset chart container
+    const container = document.querySelector('.chart-container');
+    container.innerHTML = '<canvas id="mainChart"></canvas>';
+    
+    document.getElementById('chartInfo').style.display = 'none';
+    document.getElementById('chartType').value = '';
+    document.getElementById('xColumn').value = '';
+    document.getElementById('yColumn').value = '';
+    document.getElementById('barColumn').value = '';
+    document.getElementById('lineColumn').value = '';
+    document.getElementById('categoryColumn').value = '';
+}
+</script>
+{% endblock %}

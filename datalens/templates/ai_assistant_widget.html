@@ -1,0 +1,356 @@
+<!-- AI Assistant Floating Widget -->
+<div id="ai-assistant-widget" class="ai-assistant-widget">
+    <!-- Toggle Button -->
+    <button id="ai-assistant-toggle" class="ai-assistant-toggle" title="Assistant IA DataLens">
+        <span class="ai-icon">🤖</span>
+        <span class="ai-notification-badge" id="ai-notification-badge" style="display: none;">1</span>
+    </button>
+    
+    <!-- Chat Window -->
+    <div id="ai-assistant-chat" class="ai-assistant-chat" style="display: none;">
+        <div class="ai-chat-header">
+            <div class="ai-chat-title">
+                <span class="ai-icon-small">🤖</span>
+                <span>Assistant DataLens IA</span>
+            </div>
+            <div class="ai-chat-controls">
+                <button id="ai-minimize" class="ai-control-btn" title="Minimiser">−</button>
+                <button id="ai-close" class="ai-control-btn" title="Fermer">×</button>
+            </div>
+        </div>
+        
+        <div class="ai-chat-messages" id="ai-chat-messages">
+            <div class="ai-message ai-message-welcome">
+                <div class="ai-avatar">🤖</div>
+                <div class="ai-message-content">
+                    <p>👋 Bonjour ! Je suis votre assistant IA DataLens.</p>
+                    <p>Je peux vous aider à :</p>
+                    <ul>
+                        <li>📊 Analyser vos données</li>
+                        <li>📈 Créer des visualisations</li>
+                        <li>🔍 Découvrir des insights</li>
+                        <li>❓ Répondre à vos questions</li>
+                    </ul>
+                    <p class="ai-hint">Comment puis-je vous aider aujourd'hui ?</p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="ai-chat-suggestions" id="ai-chat-suggestions">
+            <button class="ai-suggestion-btn" data-question="Comment analyser mes données ?">
+                📊 Comment analyser ?
+            </button>
+            <button class="ai-suggestion-btn" data-question="Quels graphiques créer ?">
+                📈 Quels graphiques ?
+            </button>
+            <button class="ai-suggestion-btn" data-question="Comment nettoyer mes données ?">
+                🧹 Nettoyage données
+            </button>
+        </div>
+        
+        <div class="ai-chat-input-area">
+            <div class="ai-input-group">
+                <input type="text" id="ai-user-input" class="ai-input" 
+                       placeholder="Posez votre question..." maxlength="500">
+                <button id="ai-send-btn" class="ai-send-btn" title="Envoyer">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="22" y1="2" x2="11" y2="13"></line>
+                        <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                    </svg>
+                </button>
+            </div>
+            <div class="ai-input-hint">
+                <span>Entrée pour envoyer • Échap pour fermer</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+<script>
+(function() {
+    // AI Assistant Widget Controller
+    const widget = document.getElementById('ai-assistant-widget');
+    const toggle = document.getElementById('ai-assistant-toggle');
+    const chat = document.getElementById('ai-assistant-chat');
+    const closeBtn = document.getElementById('ai-close');
+    const minimizeBtn = document.getElementById('ai-minimize');
+    const messagesContainer = document.getElementById('ai-chat-messages');
+    const userInput = document.getElementById('ai-user-input');
+    const sendBtn = document.getElementById('ai-send-btn');
+    const suggestions = document.getElementById('ai-chat-suggestions');
+    
+    let isOpen = false;
+    let currentDatasetId = null;
+    
+    // Get dataset ID from URL if available
+    const pathMatch = window.location.pathname.match(/\/dataset\/(\d+)/);
+    if (pathMatch) {
+        currentDatasetId = parseInt(pathMatch[1]);
+    }
+
+    function datasetPath(path) {
+        return currentDatasetId ? `/dataset/${currentDatasetId}${path}` : null;
+    }
+
+    function isNavigableUrl(url) {
+        return url && url !== '#' && !url.startsWith('#');
+    }
+
+    function resolveActionUrl(action, url) {
+        switch (action) {
+            case 'upload':
+                return '/upload';
+            case 'dashboard':
+                return '/dashboard';
+            case 'visualize':
+            case 'create_chart':
+            case 'more_charts':
+            case 'alternatives':
+                return datasetPath('/visualize');
+            case 'analyze':
+            case 'ai_insights':
+            case 'insights':
+                return datasetPath('/ai_insights');
+            case 'stats':
+            case 'statistics':
+                return datasetPath('/analysis');
+            case 'report':
+                return datasetPath('/ai_report');
+            case 'auto_ai_analysis':
+            case 'auto_report':
+                return datasetPath('/auto-ai-analysis');
+            case 'clean':
+            case 'auto_clean':
+            case 'detect_issues':
+                return datasetPath('/ai_insights');
+            default:
+                return isNavigableUrl(url) ? url : null;
+        }
+    }
+
+    function showNavigationLoading() {
+        const overlay = document.getElementById('navLoadingOverlay');
+        if (overlay) overlay.classList.add('is-visible');
+    }
+    
+    // Toggle chat window
+    toggle.addEventListener('click', () => {
+        isOpen = !isOpen;
+        chat.style.display = isOpen ? 'flex' : 'none';
+        if (isOpen) {
+            userInput.focus();
+        }
+    });
+    
+    // Close button
+    closeBtn.addEventListener('click', () => {
+        isOpen = false;
+        chat.style.display = 'none';
+    });
+    
+    // Minimize button
+    minimizeBtn.addEventListener('click', () => {
+        isOpen = false;
+        chat.style.display = 'none';
+    });
+    
+    // Send message
+    function sendMessage() {
+        const message = userInput.value.trim();
+        if (!message) return;
+        
+        // Add user message
+        addMessage('user', message);
+        userInput.value = '';
+        
+        // Show loading
+        showLoading();
+        
+        // Send to API
+        askAI(message);
+    }
+    
+    sendBtn.addEventListener('click', sendMessage);
+    
+    userInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+            sendMessage();
+        }
+        if (e.key === 'Escape') {
+            isOpen = false;
+            chat.style.display = 'none';
+        }
+    });
+    
+    // Suggestion buttons
+    document.querySelectorAll('.ai-suggestion-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const question = btn.dataset.question;
+            userInput.value = question;
+            sendMessage();
+        });
+    });
+    
+    // Add message to chat
+    function addMessage(sender, content, actions = []) {
+        const messageDiv = document.createElement('div');
+        messageDiv.className = `ai-message ai-message-${sender}`;
+        
+        messageDiv.innerHTML = `
+            <div class="ai-avatar">${sender === 'user' ? '👤' : '🤖'}</div>
+            <div class="ai-message-content">${content}</div>
+        `;
+
+        if (actions && actions.length > 0) {
+            const contentNode = messageDiv.querySelector('.ai-message-content');
+            const actionsNode = document.createElement('div');
+            actionsNode.className = 'ai-action-buttons';
+
+            actions.forEach(action => {
+                const link = document.createElement('a');
+                const targetUrl = resolveActionUrl(action.action, action.url);
+                link.href = targetUrl || '#';
+                link.className = 'ai-action-btn';
+                link.textContent = action.label || 'Ouvrir';
+                link.addEventListener('click', function(event) {
+                    if (!targetUrl) {
+                        event.preventDefault();
+                        return;
+                    }
+                    showNavigationLoading();
+                });
+                actionsNode.appendChild(link);
+            });
+
+            contentNode.appendChild(actionsNode);
+        }
+        
+        messagesContainer.appendChild(messageDiv);
+        messagesContainer.scrollTop = messagesContainer.scrollHeight;
+    }
+    
+    // Show loading animation
+    function showLoading() {
+        const loadingDiv = document.createElement('div');
+        loadingDiv.id = 'ai-loading';
+        loadingDiv.className = 'ai-message';
+        loadingDiv.innerHTML = `
+            <div class="ai-avatar">🤖</div>
+            <div class="ai-message-content">
+                <div class="ai-loading">
+                    <div class="ai-loading-dot"></div>
+                    <div class="ai-loading-dot"></div>
+                    <div class="ai-loading-dot"></div>
+                </div>
+            </div>
+        `;
+        messagesContainer.appendChild(loadingDiv);
+        messagesContainer.scrollTop = messagesContainer.scrollHeight;
+    }
+    
+    // Remove loading
+    function removeLoading() {
+        const loading = document.getElementById('ai-loading');
+        if (loading) loading.remove();
+    }
+    
+    // Ask AI API
+    async function askAI(question) {
+        try {
+            const response = await fetch('/api/ai-assistant/ask', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    question: question,
+                    dataset_id: currentDatasetId
+                })
+            });
+            
+            removeLoading();
+            
+            if (!response.ok) {
+                throw new Error('API request failed');
+            }
+            
+            const data = await response.json();
+            
+            if (data.error) {
+                addMessage('ai', `❌ ${data.error}`);
+                return;
+            }
+            
+            // Add AI response with action buttons
+            const actions = (data.action_suggestions || []).map(suggestion => ({
+                label: suggestion.label,
+                url: suggestion.url,
+                action: suggestion.action
+            }));
+            
+            addMessage('ai', data.message, actions);
+            
+        } catch (error) {
+            removeLoading();
+            addMessage('ai', '❌ Désolé, je ne peux pas répondre pour le moment. Veuillez vérifier que le service IA est configuré.');
+        }
+    }
+    
+    // Handle AI action buttons
+    window.handleAIAction = function(action, url) {
+        const targetUrl = resolveActionUrl(action, url);
+        if (targetUrl) {
+            showNavigationLoading();
+            window.location.href = targetUrl;
+        }
+    };
+    
+    // Load contextual help if on dataset page
+    if (currentDatasetId) {
+        loadContextualHelp(currentDatasetId);
+    }
+    
+    async function loadContextualHelp(datasetId) {
+        try {
+            const response = await fetch(`/api/ai-assistant/analyze/${datasetId}?view=overview`);
+            if (response.ok) {
+                const data = await response.json();
+                
+                // Update suggestions based on AI recommendations
+                if (data.action_suggestions && data.action_suggestions.length > 0) {
+                    suggestions.innerHTML = '';
+                    data.action_suggestions.slice(0, 3).forEach(suggestion => {
+                        const btn = document.createElement('button');
+                        btn.className = 'ai-suggestion-btn';
+                        btn.textContent = suggestion.label;
+                        btn.onclick = () => {
+                            const targetUrl = resolveActionUrl(suggestion.action, suggestion.url);
+                            if (targetUrl) {
+                                showNavigationLoading();
+                                window.location.href = targetUrl;
+                            } else {
+                                userInput.value = suggestion.label || '';
+                                sendMessage();
+                            }
+                        };
+                        suggestions.appendChild(btn);
+                    });
+                }
+            }
+        } catch (error) {
+            console.log('Could not load contextual help');
+        }
+    }
+    
+    // Welcome message animation
+    setTimeout(() => {
+        if (!isOpen) {
+            toggle.classList.add('ai-pulse-once');
+            setTimeout(() => {
+                toggle.classList.remove('ai-pulse-once');
+            }, 2000);
+        }
+    }, 3000);
+})();
+</script>

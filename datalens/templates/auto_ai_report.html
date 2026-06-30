@@ -1,0 +1,166 @@
+{% extends "base.html" %}
+
+{% block title %}📊 Analyse Automatique - {{ dataset.name }} - DataLens{% endblock %}
+
+{% block content %}
+<div class="container">
+    <!-- Header -->
+    <div class="auto-analysis-header">
+        <div class="analysis-title">
+            <div class="ai-badge">🤖 IA</div>
+            <h1>{{ report.title }}</h1>
+            <p class="analysis-subtitle">{{ report.summary }}</p>
+        </div>
+        <div class="analysis-actions">
+            <a href="{{ url_for('main.view_dataset', dataset_id=dataset.id) }}" class="btn btn-secondary">📋 Voir les données</a>
+            <a href="{{ url_for('main.auto_dashboard', dataset_id=dataset.id) }}" class="btn btn-secondary">📊 Dashboard</a>
+            <a href="{{ url_for('main.auto_ai_report_pdf', dataset_id=dataset.id) }}" class="btn btn-secondary">⬇️ Télécharger PDF</a>
+            <a href="{{ url_for('main.auto_dashboard_code', dataset_id=dataset.id) }}" class="btn btn-secondary">💻 Code Dashboard (HTML)</a>
+            <button onclick="window.print()" class="btn btn-secondary">🖨️ Imprimer</button>
+        </div>
+    </div>
+    
+    {% if not ai_configured %}
+    <div class="alert alert-warning">
+        <h3>⚠️ Service IA non configuré</h3>
+        <p>Pour des analyses plus intelligentes, configurez votre clé API NVIDIA NIM :</p>
+        <ol>
+            <li>Créez une clé API NVIDIA</li>
+            <li>Ajoutez-la au fichier <code>.env</code> : <code>NVIDIA_API_KEY=votre_clé</code></li>
+            <li>Redémarrez l’application</li>
+        </ol>
+    </div>
+    {% endif %}
+    
+    <!-- Report Type Badge -->
+    <div class="report-type-badge type-{{ report.report_type }}">
+        {% if report.report_type == 'financial' %}💰 Bilan Financier
+        {% elif report.report_type == 'sales' %}📈 Rapport des Ventes
+        {% elif report.report_type == 'hr' %}👥 Rapport RH
+        {% elif report.report_type == 'inventory' %}📦 Inventaire
+        {% elif report.report_type == 'marketing' %}📢 Marketing
+        {% else %}📊 Analyse de Données
+        {% endif %}
+    </div>
+    
+    <!-- Key Metrics Cards -->
+    <div class="metrics-section">
+        <h2>📊 Indicateurs Clés</h2>
+        <div class="metrics-grid">
+            {% for metric in report.key_metrics %}
+            <div class="metric-card-large">
+                <div class="metric-icon-large">{{ metric.icon }}</div>
+                <div class="metric-label-large">{{ metric.label }}</div>
+                <div class="metric-value-large">{{ metric.value }}</div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    
+    <!-- AI Generated Report -->
+    <div class="ai-report-section">
+        <h2>📄 Bilan Généré</h2>
+        <div class="ai-report-content">
+            {{ report.formatted_report|safe }}
+        </div>
+    </div>
+    
+    <!-- Insights Section -->
+    <div class="insights-section">
+        <h2>💡 Insights de l'IA</h2>
+        <div class="insights-grid">
+            {% for insight in report.insights %}
+            <div class="insight-item">
+                <div class="insight-bullet">✓</div>
+                <div class="insight-text">{{ insight }}</div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    
+    <!-- Recommendations -->
+    <div class="recommendations-section">
+        <h2>🎯 Recommandations</h2>
+        <div class="recommendations-list">
+            {% for rec in report.recommendations %}
+            <div class="recommendation-item">
+                <div class="rec-number">{{ loop.index }}</div>
+                <div class="rec-text">{{ rec }}</div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    
+    <!-- Suggested Charts -->
+    <div class="charts-suggestions-section">
+        <h2>📈 Visualisations Suggerées</h2>
+        <div class="charts-grid">
+            {% for chart in report.charts_suggestions %}
+            <div class="chart-suggestion-card">
+                <div class="chart-icon">
+                    {% if chart.type == 'line' %}📈
+                    {% elif chart.type == 'bar' %}📊
+                    {% elif chart.type == 'pie' %}🥧
+                    {% elif chart.type == 'scatter' %}⚡
+                    {% else %}📉
+                    {% endif %}
+                </div>
+                <h3>{{ chart.title }}</h3>
+                <p>Type: {{ chart.type|title }}</p>
+                <a href="{{ url_for('main.visualize_dataset', dataset_id=dataset.id) }}?type={{ chart.type }}&x_column={{ chart.x }}" 
+                   class="btn btn-primary btn-sm">Créer</a>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    
+    <!-- Raw Data Summary -->
+    <div class="data-summary-section">
+        <h2>📋 Résumé des Données</h2>
+        <div class="data-summary-grid">
+            <div class="summary-item">
+                <span class="summary-label">Type de rapport:</span>
+                <span class="summary-value">{{ report.report_type|title }}</span>
+            </div>
+            <div class="summary-item">
+                <span class="summary-label">Lignes analysées:</span>
+                <span class="summary-value">
+                    {% if report.raw_data_summary.rows is defined %}
+                        {{ report.raw_data_summary.rows }}
+                    {% elif report.raw_data_summary.employee_count is defined %}
+                        {{ report.raw_data_summary.employee_count }}
+                    {% elif report.raw_data_summary.product_count is defined %}
+                        {{ report.raw_data_summary.product_count }}
+                    {% elif report.raw_data_summary.campaign_count is defined %}
+                        {{ report.raw_data_summary.campaign_count }}
+                    {% else %}
+                        -
+                    {% endif %}
+                </span>
+            </div>
+            <div class="summary-item">
+                <span class="summary-label">Colonnes:</span>
+                <span class="summary-value">
+                    {% if report.raw_data_summary.columns is defined %}
+                        {{ report.raw_data_summary.columns }}
+                    {% elif report.raw_data_summary.numeric is defined and report.raw_data_summary.categorical is defined %}
+                        {{ report.raw_data_summary.numeric + report.raw_data_summary.categorical }}
+                    {% else %}
+                        -
+                    {% endif %}
+                </span>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Action Buttons -->
+    <div class="bottom-actions">
+        <a href="{{ url_for('main.ai_insights', dataset_id=dataset.id) }}" class="btn btn-primary btn-large" data-loading-nav>
+            🤖 Analyse IA Détaillée
+        </a>
+        <a href="{{ url_for('main.dashboard') }}" class="btn btn-secondary btn-large">
+            ← Retour au Dashboard
+        </a>
+    </div>
+</div>
+{% endblock %}

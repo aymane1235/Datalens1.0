@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+
+{% block title %}Tableau de bord — DataLens{% endblock %}
+
+{% block content %}
+<div class="container dashboard-page">
+    <section class="dashboard-hero">
+        <h1>Tableau de bord</h1>
+        <p class="dashboard-hero__lead">
+            {{ datasets|length }} jeu{% if datasets|length != 1 %}x{% endif %} de données
+            {% if total_rows %} · {{ total_rows }} lignes au total{% endif %}
+        </p>
+    </section>
+
+    <div class="stat-strip">
+        <div class="stat-chip">
+            <span class="stat-chip__value">{{ datasets|length }}</span>
+            <span class="stat-chip__label">Datasets</span>
+        </div>
+        <div class="stat-chip">
+            <span class="stat-chip__value">{% if total_rows %}{{ total_rows }}{% else %}—{% endif %}</span>
+            <span class="stat-chip__label">Lignes (total)</span>
+        </div>
+        <div class="stat-chip">
+            <span class="stat-chip__value">
+                {% if total_size_bytes %}
+                    {% if total_size_bytes >= 1048576 %}
+                        {{ '%.1f'|format(total_size_bytes / 1048576) }} Mo
+                    {% else %}
+                        {{ '%.0f'|format(total_size_bytes / 1024) }} Ko
+                    {% endif %}
+                {% else %}—{% endif %}
+            </span>
+            <span class="stat-chip__label">Volume fichiers</span>
+        </div>
+    </div>
+
+    <div class="dashboard-toolbar">
+        <h2>Vos fichiers</h2>
+        <a href="{{ url_for('main.upload') }}" class="btn btn-primary btn-large">+ Importer des données</a>
+    </div>
+
+    <div class="datasets-section">
+        {% if datasets %}
+            <div class="datasets-grid datasets-grid--elevated">
+                {% for dataset in datasets %}
+                    <article class="dataset-card">
+                        <div class="dataset-header">
+                            <h3>{{ dataset.name }}</h3>
+                            <span class="dataset-date">{{ dataset.created_at.strftime('%d %b %Y') }}</span>
+                        </div>
+                        <div class="dataset-card__meta">
+                            <span>{{ dataset.filename }}</span>
+                            <span>{{ dataset.rows_count }} × {{ dataset.columns_count }}</span>
+                        </div>
+                        <div class="dataset-info">
+                            <div class="info-item">
+                                <span class="info-label">Taille</span>
+                                <span class="info-value">{{ "%.1f"|format(dataset.file_size / 1024) }} Ko</span>
+                            </div>
+                        </div>
+                        <div class="dataset-card__actions">
+                            <a href="{{ url_for('main.view_dataset', dataset_id=dataset.id) }}" class="btn btn-primary btn-sm">Données</a>
+                            <a href="{{ url_for('main.ai_insights', dataset_id=dataset.id) }}" class="btn btn-secondary btn-sm" data-loading-nav>Insights IA</a>
+                            <a href="{{ url_for('main.ai_report', dataset_id=dataset.id) }}" class="btn btn-ghost btn-sm" data-loading-nav>Rapport IA</a>
+                            <form method="POST" action="{{ url_for('main.delete_dataset', dataset_id=dataset.id) }}" class="delete-form delete-form--flex">
+                                <button type="submit" class="btn btn-danger btn-sm delete-form__btn" onclick="return confirm('Supprimer ce dataset ?')">Supprimer</button>
+                            </form>
+                        </div>
+                    </article>
+                {% endfor %}
+            </div>
+        {% else %}
+            <div class="empty-state">
+                <div class="empty-icon" aria-hidden="true">📂</div>
+                <h3>Aucun fichier</h3>
+                <p>Importez un CSV ou Excel pour lancer analyses et rapports IA.</p>
+                <a href="{{ url_for('main.upload') }}" class="btn btn-primary btn-large">Importer</a>
+            </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+
+{% block title %}DataLens — Plateforme d’analyse de données{% endblock %}
+
+{% block body_class %}page-landing{% endblock %}
+
+{% block content %}
+<section class="landing-hero" aria-labelledby="landing-title">
+    <div class="landing-hero__bg" aria-hidden="true"></div>
+    <div class="landing-hero__content container-wide">
+        <p class="landing-eyebrow">Analyse &amp; intelligence artificielle</p>
+        <h1 id="landing-title" class="landing-title">Donnez du sens à vos fichiers</h1>
+        <p class="landing-lead">
+            Importez CSV ou Excel, explorez la qualité des données, générez des graphiques
+            et des rapports IA structurés — le tout dans une interface claire et rapide.
+        </p>
+        <div class="landing-actions">
+            <a href="{{ url_for('auth.register') }}" class="btn btn-primary btn-large">Commencer</a>
+            <a href="{{ url_for('auth.login') }}" class="btn btn-ghost btn-large">Se connecter</a>
+        </div>
+        <ul class="landing-stats" aria-label="Points clés">
+            <li><span class="landing-stats__num">CSV</span><span class="landing-stats__lbl">· Excel</span></li>
+            <li><span class="landing-stats__num">IA</span><span class="landing-stats__lbl">Rapports</span></li>
+            <li><span class="landing-stats__num">Viz</span><span class="landing-stats__lbl">Graphiques</span></li>
+        </ul>
+    </div>
+</section>
+
+<section class="landing-features" aria-labelledby="features-title">
+    <div class="container-wide">
+        <header class="section-head">
+            <h2 id="features-title" class="section-head__title">Une suite complète</h2>
+            <p class="section-head__subtitle">Du premier import au rapport partageable, chaque étape est pensée pour la lisibilité.</p>
+        </header>
+        <div class="features-grid features-grid--landing">
+            <article class="feature-card feature-card--elevated">
+                <span class="feature-card__step">01</span>
+                <h3>Import sécurisé</h3>
+                <p>Fichiers CSV, XLSX et XLS avec authentification et espace de travail personnel.</p>
+            </article>
+            <article class="feature-card feature-card--elevated">
+                <span class="feature-card__step">02</span>
+                <h3>Profilage &amp; statistiques</h3>
+                <p>Aperçu des données, valeurs manquantes, types de colonnes et indicateurs synthétiques.</p>
+            </article>
+            <article class="feature-card feature-card--elevated">
+                <span class="feature-card__step">03</span>
+                <h3>Visualisations</h3>
+                <p>Constructeur de graphiques et tableaux de bord automatiques adaptés à votre schéma.</p>
+            </article>
+            <article class="feature-card feature-card--elevated">
+                <span class="feature-card__step">04</span>
+                <h3>Insights &amp; rapports IA</h3>
+                <p>Synthèses, rapports exécutifs ou qualité des données, export PDF à la demande.</p>
+            </article>
+            <article class="feature-card feature-card--elevated">
+                <span class="feature-card__step">05</span>
+                <h3>Analyse avancée</h3>
+                <p>Corrélations, outliers et filtres pour aller plus loin que les simples moyennes.</p>
+            </article>
+            <article class="feature-card feature-card--elevated">
+                <span class="feature-card__step">06</span>
+                <h3>Tableau de bord central</h3>
+                <p>Retrouvez tous vos jeux de données, volumes et accès rapides aux actions.</p>
+            </article>
+        </div>
+    </div>
+</section>
+
+<section class="landing-cta">
+    <div class="landing-cta__inner container-wide">
+        <div>
+            <h2 class="landing-cta__title">Prêt à analyser ?</h2>
+            <p class="landing-cta__text">Créez un compte et importez votre premier fichier en quelques secondes.</p>
+        </div>
+        <a href="{{ url_for('auth.register') }}" class="btn btn-primary btn-large">Créer un compte</a>
+    </div>
+</section>
+{% endblock %}

@@ -1,0 +1,115 @@
+{% extends "base.html" %}
+
+{% block title %}Rapport IA — {{ dataset.name }} — DataLens{% endblock %}
+
+{% block content %}
+<div class="container page-ai-report">
+    <div class="page-hero page-hero--report">
+        <div class="page-hero__text">
+            <p class="page-hero__eyebrow">Rapport structuré</p>
+            <h1>{{ dataset.name }}</h1>
+            <p class="page-hero__meta">
+                {{ dataset.filename }} · {{ dataset.rows_count }} lignes × {{ dataset.columns_count }} colonnes
+            </p>
+        </div>
+        <div class="page-hero__actions">
+            <a href="{{ url_for('main.ai_insights', dataset_id=dataset.id) }}" class="btn btn-secondary btn-compact" data-loading-nav>Insights IA</a>
+            <a href="{{ url_for('main.auto_dashboard', dataset_id=dataset.id) }}" class="btn btn-secondary btn-compact">Auto dashboard</a>
+            <a href="{{ url_for('main.view_dataset', dataset_id=dataset.id) }}" class="btn btn-ghost btn-compact">Données</a>
+            <a href="{{ url_for('main.dashboard') }}" class="btn btn-ghost btn-compact">Accueil</a>
+        </div>
+    </div>
+
+    {% if report_error %}
+    <div class="alert alert-error">
+        <h3>{% if report %}Rapport IA indisponible{% else %}Génération interrompue{% endif %}</h3>
+        <p>{{ report_error }}</p>
+        <p><a class="btn btn-primary btn-sm" href="{{ url_for('main.ai_report', dataset_id=dataset.id, type=report_type) }}">Réessayer</a></p>
+    </div>
+    {% endif %}
+
+    {% if not ai_configured %}
+    <div class="alert alert-config">
+        <h3>Clé API NVIDIA</h3>
+        <p>Les rapports enrichis utilisent l’API <strong>NVIDIA NIM</strong>. Ajoutez une clé dans votre fichier <code>.env</code> :</p>
+        <pre class="env-snippet">NVIDIA_API_KEY=votre_cle_ici</pre>
+        <p class="muted">Redémarrez l’application après modification.</p>
+    </div>
+    {% endif %}
+
+    <div class="report-type-panel">
+        <h2 class="report-type-panel__title">Type de rapport</h2>
+        <p class="report-type-panel__hint">Choisissez un angle ; le contenu est régénéré à chaque sélection.</p>
+        <div class="report-type-grid">
+            <a href="{{ url_for('main.ai_report', dataset_id=dataset.id, type='summary') }}"
+               class="report-type-card {{ 'is-active' if report_type == 'summary' else '' }}">
+                <span class="report-type-card__icon" aria-hidden="true">📋</span>
+                <h3>Analytique</h3>
+                <p>Vue complète : qualité, statistiques, pistes d’analyse et usages possibles.</p>
+            </a>
+            <a href="{{ url_for('main.ai_report', dataset_id=dataset.id, type='executive') }}"
+               class="report-type-card {{ 'is-active' if report_type == 'executive' else '' }}">
+                <span class="report-type-card__icon" aria-hidden="true">📊</span>
+                <h3>Exécutif</h3>
+                <p>Synthèse courte pour décideurs : constats, enjeux, recommandations.</p>
+            </a>
+            <a href="{{ url_for('main.ai_report', dataset_id=dataset.id, type='quality') }}"
+               class="report-type-card {{ 'is-active' if report_type == 'quality' else '' }}">
+                <span class="report-type-card__icon" aria-hidden="true">✅</span>
+                <h3>Qualité des données</h3>
+                <p>Profilage ciblé : manquants, types, risques de doublons et plan d’action.</p>
+            </a>
+        </div>
+    </div>
+
+    <article class="ai-report-card">
+        <header class="ai-report-card__header">
+            <div>
+                <h2 class="ai-report-card__title">
+                    {% if report_type == 'executive' %}Synthèse exécutive{% elif report_type == 'quality' %}Rapport qualité{% else %}Rapport analytique{% endif %}
+                </h2>
+                <p class="ai-report-card__subtitle">Export et partage</p>
+            </div>
+            <div class="ai-report-card__toolbar">
+                <a class="btn btn-secondary btn-sm" href="{{ url_for('main.ai_report_pdf', dataset_id=dataset.id, type=report_type) }}">PDF</a>
+                <button type="button" class="btn btn-ghost btn-sm" onclick="window.print()">Imprimer</button>
+                <button type="button" class="btn btn-ghost btn-sm" id="copyReportBtn">Copier le texte</button>
+            </div>
+        </header>
+
+        <div class="report-body prose-report" id="report-content">
+            {% if report %}
+                <div class="ai-generated-content">
+                    {{ report|safe }}
+                </div>
+            {% else %}
+                <div class="empty-state empty-state--compact">
+                    <div class="empty-icon" aria-hidden="true">📭</div>
+                    <h3>Aucun contenu</h3>
+                    <p>Vérifiez la configuration de l’API ou réessayez dans un instant.</p>
+                </div>
+            {% endif %}
+        </div>
+    </article>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function () {
+    var btn = document.getElementById('copyReportBtn');
+    if (!btn) return;
+    btn.addEventListener('click', function () {
+        var el = document.getElementById('report-content');
+        var text = el ? el.innerText : '';
+        if (!text.trim()) return;
+        navigator.clipboard.writeText(text).then(function () {
+            btn.textContent = 'Copié !';
+            setTimeout(function () { btn.textContent = 'Copier le texte'; }, 2000);
+        }).catch(function () {
+            alert('Copie impossible : sélectionnez le texte manuellement.');
+        });
+    });
+})();
+</script>
+{% endblock %}

@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+
+{% block title %}Importer — DataLens{% endblock %}
+
+{% block content %}
+<div class="container simple-upload">
+    <div class="upload-header">
+        <h1>Importer un fichier</h1>
+        <p>Formats acceptés : Excel (.xlsx, .xls) ou CSV</p>
+    </div>
+
+    <div class="upload-container">
+        <form method="POST" enctype="multipart/form-data" class="upload-form">
+            <div class="form-group">
+                <label for="dataset_name" class="form-label">Nom du jeu de données</label>
+                <input type="text" id="dataset_name" name="dataset_name" class="form-control" placeholder="Ex. Ventes 2024" required>
+            </div>
+
+            <div class="form-group">
+                <label for="file" class="form-label">Fichier</label>
+                <div class="file-upload-area">
+                    <input type="file" id="file" name="file" class="file-input" accept=".csv,.xlsx,.xls" required>
+                    <div class="file-upload-label">
+                        <div class="upload-icon" aria-hidden="true">📁</div>
+                        <p>Glissez-déposez ou cliquez pour choisir</p>
+                        <p class="upload-hint">CSV ou Excel — max. 16 Mo</p>
+                    </div>
+                </div>
+            </div>
+
+            <button type="submit" class="btn btn-primary btn-full btn-large">Envoyer le fichier</button>
+        </form>
+    </div>
+
+    <div class="back-link">
+        <a href="{{ url_for('main.dashboard') }}">← Retour au tableau de bord</a>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const fileInput = document.getElementById('file');
+const fileUploadLabel = document.querySelector('.file-upload-label');
+
+fileInput.addEventListener('change', function(e) {
+    const fileName = e.target.files[0]?.name;
+    if (fileName) {
+        fileUploadLabel.innerHTML = `
+            <div class="upload-icon" aria-hidden="true">✅</div>
+            <p>${fileName}</p>
+            <p class="upload-hint">Cliquez pour changer de fichier</p>
+        `;
+    }
+});
+
+const fileUploadArea = document.querySelector('.file-upload-area');
+
+fileUploadArea.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    fileUploadArea.classList.add('drag-over');
+});
+
+fileUploadArea.addEventListener('dragleave', () => {
+    fileUploadArea.classList.remove('drag-over');
+});
+
+fileUploadArea.addEventListener('drop', (e) => {
+    e.preventDefault();
+    fileUploadArea.classList.remove('drag-over');
+
+    const files = e.dataTransfer.files;
+    if (files.length > 0) {
+        fileInput.files = files;
+        const event = new Event('change', { bubbles: true });
+        fileInput.dispatchEvent(event);
+    }
+});
+</script>
+{% endblock %}

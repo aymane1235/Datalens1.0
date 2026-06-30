@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#0f172a">
+    <title>{% block title %}DataLens — Analytics{% endblock %}</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&family=Plus+Jakarta+Sans:ital,wght@0,400..700;1,400..600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body class="{% block body_class %}{% endblock %}">
+    <a class="skip-link" href="#site-main">Aller au contenu</a>
+
+    <div class="app-shell">
+        <header class="site-header">
+            <div class="site-header__inner">
+                <a href="{{ url_for('main.index') }}" class="brand" aria-label="DataLens — accueil">
+                    <span class="brand__mark" aria-hidden="true"></span>
+                    <span class="brand__text">DataLens</span>
+                </a>
+
+                <button type="button" class="nav-toggle" id="navToggle" aria-expanded="false" aria-controls="primaryNav" aria-label="Menu">
+                    <span class="nav-toggle__bar" aria-hidden="true"></span>
+                    <span class="nav-toggle__bar" aria-hidden="true"></span>
+                    <span class="nav-toggle__bar" aria-hidden="true"></span>
+                </button>
+
+                <nav id="primaryNav" class="nav-menu" aria-label="Navigation principale">
+                    {% if current_user %}
+                        <a href="{{ url_for('main.dashboard') }}" class="nav-link">Tableau de bord</a>
+                        <a href="{{ url_for('main.upload') }}" class="nav-link">Importer</a>
+                        <span class="nav-user">{{ current_user.username }}</span>
+                        <a href="{{ url_for('auth.logout') }}" class="nav-link nav-link--muted">Déconnexion</a>
+                    {% else %}
+                        <a href="{{ url_for('auth.login') }}" class="nav-link">Connexion</a>
+                        <a href="{{ url_for('auth.register') }}" class="nav-link nav-link--cta">Créer un compte</a>
+                    {% endif %}
+                </nav>
+            </div>
+        </header>
+
+        <main id="site-main" class="site-main">
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    <div class="flash-messages container-wide" role="region" aria-label="Messages">
+                        {% for category, message in messages %}
+                            <div class="flash-message flash-{{ category }}" role="status">{{ message }}</div>
+                        {% endfor %}
+                    </div>
+                {% endif %}
+            {% endwith %}
+
+            {% block content %}{% endblock %}
+        </main>
+
+        <footer class="site-footer">
+            <div class="site-footer__inner">
+                <div class="site-footer__brand">
+                    <span class="brand__mark brand__mark--footer" aria-hidden="true"></span>
+                    <div>
+                        <strong>DataLens</strong>
+                        <p class="site-footer__tagline">Import, analyse et visualisation de données.</p>
+                    </div>
+                </div>
+                <p class="site-footer__legal">&copy; 2026 DataLens</p>
+            </div>
+        </footer>
+    </div>
+
+    {% if current_user %}
+        {% include "ai_assistant_widget.html" %}
+    {% endif %}
+
+    <div id="navLoadingOverlay" class="nav-loading-overlay" aria-hidden="true">
+        <div class="nav-loading-card">
+            <div class="nav-loading-spinner" aria-hidden="true"></div>
+            <p class="nav-loading-title">Chargement…</p>
+            <p class="nav-loading-sub">Traitement en cours, merci de patienter.</p>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/script.js') }}"></script>
+    <script>
+    document.body.addEventListener('click', function (e) {
+        var t = e.target.closest('[data-loading-nav]');
+        if (t) {
+            var ov = document.getElementById('navLoadingOverlay');
+            if (ov) ov.classList.add('is-visible');
+        }
+    });
+    </script>
+    {% block scripts %}{% endblock %}
+</body>
+</html>

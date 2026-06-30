@@ -1,0 +1,302 @@
+{% extends "base.html" %}
+
+{% block title %}AI Insights - {{ dataset.name }} - DataLens{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="page-hero page-hero--report">
+        <div class="page-hero__text">
+            <p class="page-hero__eyebrow">Insights IA</p>
+            <h1>{{ dataset.name }}</h1>
+            <p class="page-hero__meta">
+                {{ dataset.filename }} · {{ dataset.rows_count }} lignes × {{ dataset.columns_count }} colonnes
+            </p>
+        </div>
+        <div class="page-hero__actions">
+            <a href="{{ url_for('main.ai_report', dataset_id=dataset.id) }}" class="btn btn-primary btn-compact" data-loading-nav>Rapport IA</a>
+            <a href="{{ url_for('main.auto_dashboard', dataset_id=dataset.id) }}" class="btn btn-secondary btn-compact">Auto dashboard</a>
+            <a href="{{ url_for('main.view_dataset', dataset_id=dataset.id) }}" class="btn btn-ghost btn-compact">Données</a>
+            <a href="{{ url_for('main.dashboard') }}" class="btn btn-ghost btn-compact">Accueil</a>
+        </div>
+    </div>
+    
+    {% if not ai_configured %}
+    <div class="alert alert-config">
+        <h3>Service IA non configuré</h3>
+        <p>Ajoutez une clé <strong>NVIDIA NIM</strong> dans votre fichier <code>.env</code> :</p>
+        <pre class="env-snippet">NVIDIA_API_KEY=votre_cle</pre>
+        <p class="muted">Redémarrez l’application après modification.</p>
+    </div>
+    {% endif %}
+    
+    <!-- AI Overview -->
+    <div class="ai-section">
+        <h2>📊 Dataset Overview</h2>
+        <div class="ai-overview">
+            <div class="overview-card">
+                <h3>🔍 Description</h3>
+                <p>{{ overview.overview }}</p>
+            </div>
+            
+            <div class="overview-card">
+                <h3>📈 Data Quality</h3>
+                <div class="quality-indicator {{ overview.data_quality }}">
+                    {{ overview.data_quality|title }}
+                </div>
+            </div>
+            
+            <div class="overview-card">
+                <h3>💡 Key Insights</h3>
+                <ul>
+                    {% for insight in overview.key_insights %}
+                    <li>{{ insight }}</li>
+                    {% endfor %}
+                </ul>
+            </div>
+            
+            <div class="overview-card">
+                <h3>🎯 Potential Uses</h3>
+                <ul>
+                    {% for use in overview.potential_uses %}
+                    <li>{{ use }}</li>
+                    {% endfor %}
+                </ul>
+            </div>
+        </div>
+    </div>
+    
+    <!-- AI-Recommended Visualizations -->
+    <div class="ai-section">
+        <h2>📈 AI-Recommended Visualizations</h2>
+        <div class="visualizations-grid">
+            {% for viz in visualizations %}
+            <div class="viz-card">
+                <div class="viz-header">
+                    <h3>{{ viz.title }}</h3>
+                    <span class="viz-type">{{ viz.chart_type|title }}</span>
+                </div>
+                <div class="viz-content">
+                    <p class="viz-description">{{ viz.description }}</p>
+                    <div class="viz-insight">
+                        <strong>🔍 Insight:</strong> {{ viz.insight }}
+                    </div>
+                    {% if viz.x_column %}
+                    <div class="viz-config">
+                        <strong>Configuration:</strong>
+                        {% if viz.y_column %}
+                        X: {{ viz.x_column }}, Y: {{ viz.y_column }}
+                        {% else %}
+                        Column: {{ viz.x_column }}
+                        {% endif %}
+                    </div>
+                    {% endif %}
+                </div>
+                <div class="viz-actions">
+                    <button class="btn btn-primary btn-sm" onclick="createAIViz('{{ viz.chart_type }}', '{{ viz.x_column }}', '{{ viz.y_column or '' }}')">
+                        Create Chart
+                    </button>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    
+    <!-- Data Cleaning Suggestions -->
+    <div class="ai-section">
+        <h2>🧹 Data Cleaning Suggestions</h2>
+        <div class="cleaning-content">
+            <div class="cleaning-overview">
+                <div class="cleaning-score">
+                    <span class="score-label">Overall Quality:</span>
+                    <span class="score-value {{ cleaning_suggestions.overall_quality }}">
+                        {{ cleaning_suggestions.overall_quality|title }}
+                    </span>
+                </div>
+                <div class="cleaning-effort">
+                    <span class="effort-label">Estimated Effort:</span>
+                    <span class="effort-value {{ cleaning_suggestions.estimated_effort }}">
+                        {{ cleaning_suggestions.estimated_effort|title }}
+                    </span>
+                </div>
+            </div>
+            
+            {% if cleaning_suggestions.issues_found %}
+            <div class="issues-list">
+                <h3>🔍 Issues Found</h3>
+                {% for issue in cleaning_suggestions.issues_found %}
+                <div class="issue-card severity-{{ issue.severity }}">
+                    <div class="issue-header">
+                        <span class="issue-type">{{ issue.issue_type|replace('_', ' ')|title }}</span>
+                        <span class="issue-severity">{{ issue.severity|title }}</span>
+                    </div>
+                    <div class="issue-content">
+                        <p><strong>Column:</strong> {{ issue.column }}</p>
+                        <p><strong>Description:</strong> {{ issue.description }}</p>
+                        <p><strong>Recommendation:</strong> {{ issue.recommendation }}</p>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+            
+            {% if cleaning_suggestions.cleaning_priority %}
+            <div class="cleaning-priority">
+                <h3>🎯 Cleaning Priority</h3>
+                <ol>
+                    {% for priority in cleaning_suggestions.cleaning_priority %}
+                    <li>{{ priority|replace('_', ' ')|title }}</li>
+                    {% endfor %}
+                </ol>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    
+    <!-- AI Chat Interface -->
+    <div class="ai-section">
+        <h2>💬 Ask AI About Your Data</h2>
+        <div class="ai-chat">
+            <div class="chat-messages" id="chatMessages">
+                <div class="ai-message">
+                    <div class="message-content">
+                        👋 Hello! I'm your AI data assistant. Ask me anything about your dataset, such as:
+                        <ul>
+                            <li>"What are the main trends in this data?"</li>
+                            <li>"Which columns have the strongest correlation?"</li>
+                            <li>"Are there any outliers I should investigate?"</li>
+                            <li>"What's the best way to visualize sales data?"</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="chat-input">
+                <div class="input-group">
+                    <input type="text" id="aiQuestion" class="form-control" placeholder="Ask a question about your data..." 
+                           {% if not ai_configured %}disabled{% endif %}>
+                    <button class="btn btn-primary" id="askAI" {% if not ai_configured %}disabled{% endif %}>
+                        {% if ai_configured %}Ask AI{% else %}AI Not Available{% endif %}
+                    </button>
+                </div>
+                {% if not ai_configured %}
+                <small class="text-muted">Configurez NVIDIA_API_KEY pour activer le chat IA</small>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const datasetId = {{ dataset.id }};
+
+// AI Chat functionality
+document.getElementById('askAI').addEventListener('click', function() {
+    const question = document.getElementById('aiQuestion').value.trim();
+    if (!question) return;
+    
+    // Add user message
+    addMessage('user', question);
+    
+    // Clear input
+    document.getElementById('aiQuestion').value = '';
+    
+    // Show loading
+    addMessage('ai', '🤔 Thinking...');
+    
+    // Send to AI
+    fetch(`/dataset/${datasetId}/ai_query`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ question: question })
+    })
+    .then(response => response.json())
+    .then(data => {
+        // Remove loading message
+        removeLastMessage();
+        
+        if (data.error) {
+            addMessage('ai', `❌ Error: ${data.error}`);
+        } else {
+            let responseHtml = `
+                <div class="ai-answer">
+                    <p><strong>Answer:</strong> ${data.answer}</p>
+            `;
+            
+            if (data.confidence) {
+                responseHtml += `<p><strong>Confidence:</strong> ${data.confidence}</p>`;
+            }
+            
+            if (data.suggested_visualization) {
+                responseHtml += `
+                    <div class="suggested-viz">
+                        <strong>Suggested Visualization:</strong> ${data.suggested_visualization.chart_type} - ${data.suggested_visualization.title}
+                        <p>${data.suggested_visualization.description}</p>
+                    </div>
+                `;
+            }
+            
+            if (data.follow_up_questions && data.follow_up_questions.length > 0) {
+                responseHtml += `
+                    <div class="follow-up">
+                        <strong>Follow-up questions:</strong>
+                        <ul>
+                `;
+                data.follow_up_questions.forEach(q => {
+                    responseHtml += `<li><a href="#" class="follow-up-question" onclick="askFollowUp('${q}')">${q}</a></li>`;
+                });
+                responseHtml += `</ul></div>`;
+            }
+            
+            responseHtml += '</div>';
+            addMessage('ai', responseHtml);
+        }
+    })
+    .catch(error => {
+        removeLastMessage();
+        addMessage('ai', `❌ Error: ${error.message}`);
+    });
+});
+
+// Enter key to send message
+document.getElementById('aiQuestion').addEventListener('keypress', function(e) {
+    if (e.key === 'Enter') {
+        document.getElementById('askAI').click();
+    }
+});
+
+function addMessage(sender, content) {
+    const messagesDiv = document.getElementById('chatMessages');
+    const messageDiv = document.createElement('div');
+    messageDiv.className = `${sender}-message`;
+    messageDiv.innerHTML = `<div class="message-content">${content}</div>`;
+    messagesDiv.appendChild(messageDiv);
+    messagesDiv.scrollTop = messagesDiv.scrollHeight;
+}
+
+function removeLastMessage() {
+    const messagesDiv = document.getElementById('chatMessages');
+    if (messagesDiv.lastChild) {
+        messagesDiv.removeChild(messagesDiv.lastChild);
+    }
+}
+
+function askFollowUp(question) {
+    document.getElementById('aiQuestion').value = question;
+    document.getElementById('askAI').click();
+}
+
+function createAIViz(chartType, xColumn, yColumn) {
+    // Redirect to visualize page with pre-filled parameters
+    let url = `/dataset/${datasetId}/visualize?type=${chartType}`;
+    if (xColumn) url += `&x_column=${xColumn}`;
+    if (yColumn) url += `&y_column=${yColumn}`;
+    
+    window.open(url, '_blank');
+}
+</script>
+
+{% endblock %}

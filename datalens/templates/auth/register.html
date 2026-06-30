@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+
+{% block title %}Inscription — DataLens{% endblock %}
+
+{% block content %}
+<div class="auth-container">
+    <div class="auth-card">
+        <div class="auth-header">
+            <h2>Créer un compte</h2>
+            <p>Rejoignez DataLens et importez vos premiers jeux de données.</p>
+        </div>
+        
+        <form method="POST" class="auth-form">
+            <div class="form-group">
+                <label for="username" class="form-label">Identifiant</label>
+                <input type="text" id="username" name="username" class="form-control" required autocomplete="username">
+            </div>
+            
+            <div class="form-group">
+                <label for="email" class="form-label">E-mail</label>
+                <input type="email" id="email" name="email" class="form-control" required autocomplete="email">
+            </div>
+            
+            <div class="form-group">
+                <label for="password" class="form-label">Mot de passe</label>
+                <input type="password" id="password" name="password" class="form-control" required autocomplete="new-password">
+            </div>
+            
+            <div class="form-group">
+                <label for="confirm_password" class="form-label">Confirmer le mot de passe</label>
+                <input type="password" id="confirm_password" name="confirm_password" class="form-control" required autocomplete="new-password">
+            </div>
+            
+            <button type="submit" class="btn btn-primary btn-full">Créer mon compte</button>
+        </form>
+        
+        <div class="auth-footer">
+            <p>Déjà inscrit ? <a href="{{ url_for('auth.login') }}">Se connecter</a></p>
+        </div>
+    </div>
+</div>
+{% endblock %}

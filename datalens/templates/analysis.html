@@ -1,0 +1,521 @@
+{% extends "base.html" %}
+
+{% block title %}Analysis - {{ dataset.name }} - DataLens{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="dataset-header">
+        <div class="dataset-title">
+            <h1>Advanced Analysis - {{ dataset.name }}</h1>
+            <p class="dataset-meta">
+                File: {{ dataset.filename }} • 
+                {{ dataset.rows_count }} rows × {{ dataset.columns_count }} columns
+            </p>
+        </div>
+        <div class="dataset-actions">
+            <a href="{{ url_for('main.visualize_dataset', dataset_id=dataset.id) }}" class="btn btn-secondary">📊 Visualize</a>
+            <a href="{{ url_for('main.view_dataset', dataset_id=dataset.id) }}" class="btn btn-secondary">View Data</a>
+            <a href="{{ url_for('main.dashboard') }}" class="btn btn-secondary">Dashboard</a>
+        </div>
+    </div>
+    
+    <!-- Correlation Analysis -->
+    <div class="analysis-section">
+        <h2>🔗 Correlation Analysis</h2>
+        {% if correlations %}
+            <div class="correlations-grid">
+                {% for corr in correlations %}
+                <div class="correlation-card strength-{{ corr.strength }}">
+                    <div class="correlation-value">
+                        <span class="value {{ 'positive' if corr.correlation > 0 else 'negative' }}">
+                            {{ corr.correlation }}
+                        </span>
+                        <span class="strength">{{ corr.strength }}</span>
+                    </div>
+                    <div class="correlation-columns">
+                        <span class="column">{{ corr.column1 }}</span>
+                        <span class="vs">vs</span>
+                        <span class="column">{{ corr.column2 }}</span>
+                    </div>
+                    <button class="btn btn-primary btn-sm" onclick="createScatterPlot('{{ corr.column1 }}', '{{ corr.column2 }}')">
+                        View Scatter Plot
+                    </button>
+                </div>
+                {% endfor %}
+            </div>
+        {% else %}
+            <div class="empty-state">
+                <div class="empty-icon">📊</div>
+                <h3>No significant correlations found</h3>
+                <p>Try adjusting the correlation threshold or check if you have numeric columns.</p>
+            </div>
+        {% endif %}
+    </div>
+    
+    <!-- Outlier Detection -->
+    <div class="analysis-section">
+        <h2>🎯 Outlier Detection</h2>
+        {% if outliers %}
+            <div class="outliers-grid">
+                {% for column, outlier_list in outliers.items() %}
+                <div class="outlier-card">
+                    <h3>{{ column }}</h3>
+                    <div class="outlier-summary">
+                        <span class="count">{{ outlier_list|length }}</span>
+                        <span class="label">outliers detected</span>
+                    </div>
+                    {% if outlier_list %}
+                        <div class="outlier-details">
+                            <p><strong>Range:</strong> {{ "%.2f"|format(outlier_list[0].value) }} to {{ "%.2f"|format(outlier_list[-1].value) }}</p>
+                            <button class="btn btn-secondary btn-sm" onclick="showOutlierDetails('{{ column }}')">
+                                View Details
+                            </button>
+                        </div>
+                    {% endif %}
+                </div>
+                {% endfor %}
+            </div>
+        {% else %}
+            <div class="empty-state">
+                <div class="empty-icon">🎯</div>
+                <h3>No outliers detected</h3>
+                <p>Your data appears to be clean with no significant outliers.</p>
+            </div>
+        {% endif %}
+    </div>
+    
+    <!-- Regression Analysis -->
+    <div class="analysis-section">
+        <h2>📈 Linear Regression Analysis</h2>
+        <div class="regression-controls">
+            <div class="control-group">
+                <label for="regX" class="form-label">X Variable (Independent)</label>
+                <select id="regX" class="form-control">
+                    <option value="">Select column</option>
+                    {% for col in numeric_columns %}
+                    <option value="{{ col }}">{{ col }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="control-group">
+                <label for="regY" class="form-label">Y Variable (Dependent)</label>
+                <select id="regY" class="form-control">
+                    <option value="">Select column</option>
+                    {% for col in numeric_columns %}
+                    <option value="{{ col }}">{{ col }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="control-group">
+                <button id="runRegression" class="btn btn-primary">Run Regression</button>
+            </div>
+        </div>
+        
+        <div id="regressionResults" class="regression-results" style="display: none;">
+            <div class="regression-info">
+                <h3>Regression Results</h3>
+                <div id="regressionStats"></div>
+            </div>
+            <div class="regression-chart">
+                <canvas id="regressionChart"></canvas>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Data Filtering -->
+    <div class="analysis-section">
+        <h2>🔍 Dynamic Data Filtering</h2>
+        <div class="filter-controls">
+            <div class="filter-builder">
+                <h3>Build Your Filter</h3>
+                <div id="filterRules"></div>
+                <div class="filter-actions">
+                    <button class="btn btn-primary" onclick="addFilterRule()">Add Filter Rule</button>
+                    <button class="btn btn-secondary" onclick="applyFilters()">Apply Filters</button>
+                    <button class="btn btn-secondary" onclick="clearFilters()">Clear All</button>
+                </div>
+            </div>
+        </div>
+        
+        <div id="filterResults" class="filter-results" style="display: none;">
+            <h3>Filtered Results</h3>
+            <div class="filter-summary">
+                <span id="filterSummary"></span>
+            </div>
+            <div class="table-container">
+                <table class="data-table" id="filteredTable">
+                    <thead id="filteredTableHead"></thead>
+                    <tbody id="filteredTableBody"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Outlier Details Modal -->
+<div id="outlierModal" class="modal" style="display: none;">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>Outlier Details</h3>
+            <span class="close" onclick="closeModal()">&times;</span>
+        </div>
+        <div class="modal-body">
+            <div id="outlierDetailsContent"></div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+const datasetId = {{ dataset.id }};
+let currentCharts = {};
+let outliers = {{ outliers|tojson }};
+
+// Initialize page
+document.addEventListener('DOMContentLoaded', function() {
+    // Populate filter columns
+    populateFilterColumns();
+});
+
+function createScatterPlot(xColumn, yColumn) {
+    const url = `/dataset/${datasetId}/chart_data?type=scatter&x_column=${xColumn}&y_column=${yColumn}`;
+    
+    fetch(url)
+        .then(response => response.json())
+        .then(data => {
+            if (data.error) {
+                alert('Error: ' + data.error);
+                return;
+            }
+            
+            // Create modal for scatter plot
+            showScatterModal(data, xColumn, yColumn);
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Error creating scatter plot');
+        });
+}
+
+function showScatterModal(data, xColumn, yColumn) {
+    // Create modal content
+    const modalHtml = `
+        <div id="scatterModal" class="modal" style="display: block;">
+            <div class="modal-content large">
+                <div class="modal-header">
+                    <h3>Scatter Plot: ${yColumn} vs ${xColumn}</h3>
+                    <span class="close" onclick="closeScatterModal()">&times;</span>
+                </div>
+                <div class="modal-body">
+                    <div class="chart-container">
+                        <canvas id="scatterChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    // Add modal to page
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+    
+    // Create chart
+    const ctx = document.getElementById('scatterChart').getContext('2d');
+    new Chart(ctx, {
+        type: 'scatter',
+        data: {
+            datasets: data.datasets
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                x: {
+                    title: {
+                        display: true,
+                        text: xColumn
+                    }
+                },
+                y: {
+                    title: {
+                        display: true,
+                        text: yColumn
+                    }
+                }
+            }
+        }
+    });
+}
+
+function closeScatterModal() {
+    const modal = document.getElementById('scatterModal');
+    if (modal) {
+        modal.remove();
+    }
+}
+
+function showOutlierDetails(column) {
+    const columnOutliers = outliers[column];
+    if (!columnOutliers || columnOutliers.length === 0) return;
+    
+    let detailsHtml = `
+        <h4>Outliers in ${column}</h4>
+        <p><strong>Total outliers:</strong> ${columnOutliers.length}</p>
+        <div class="outlier-list">
+    `;
+    
+    columnOutliers.forEach(outlier => {
+        detailsHtml += `
+            <div class="outlier-item">
+                <span class="index">Row ${outlier.index + 1}</span>
+                <span class="value">Value: ${outlier.value.toFixed(2)}</span>
+            </div>
+        `;
+    });
+    
+    detailsHtml += '</div>';
+    
+    document.getElementById('outlierDetailsContent').innerHTML = detailsHtml;
+    document.getElementById('outlierModal').style.display = 'block';
+}
+
+function closeModal() {
+    document.getElementById('outlierModal').style.display = 'none';
+}
+
+// Regression Analysis
+document.getElementById('runRegression').addEventListener('click', function() {
+    const xColumn = document.getElementById('regX').value;
+    const yColumn = document.getElementById('regY').value;
+    
+    if (!xColumn || !yColumn) {
+        alert('Please select both X and Y variables');
+        return;
+    }
+    
+    const url = `/dataset/${datasetId}/regression?x_column=${xColumn}&y_column=${yColumn}`;
+    
+    fetch(url)
+        .then(response => response.json())
+        .then(data => {
+            if (data.error) {
+                alert('Error: ' + data.error);
+                return;
+            }
+            
+            displayRegressionResults(data);
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Error running regression');
+        });
+});
+
+function displayRegressionResults(data) {
+    // Show results section
+    document.getElementById('regressionResults').style.display = 'block';
+    
+    // Display statistics
+    const statsHtml = `
+        <p><strong>Equation:</strong> ${data.equation}</p>
+        <p><strong>R-squared:</strong> ${data.r_squared.toFixed(4)}</p>
+        <p><strong>Slope:</strong> ${data.slope.toFixed(4)}</p>
+        <p><strong>Intercept:</strong> ${data.intercept.toFixed(4)}</p>
+    `;
+    
+    document.getElementById('regressionStats').innerHTML = statsHtml;
+    
+    // Create regression chart
+    const ctx = document.getElementById('regressionChart').getContext('2d');
+    
+    if (currentCharts.regression) {
+        currentCharts.regression.destroy();
+    }
+    
+    currentCharts.regression = new Chart(ctx, {
+        type: 'scatter',
+        data: {
+            datasets: [
+                {
+                    label: 'Actual Data',
+                    data: data.plot_data.actual,
+                    backgroundColor: 'rgba(54, 162, 235, 0.6)',
+                    borderColor: 'rgba(54, 162, 235, 1)'
+                },
+                {
+                    label: 'Regression Line',
+                    data: data.plot_data.predicted,
+                    type: 'line',
+                    backgroundColor: 'rgba(255, 99, 132, 0.2)',
+                    borderColor: 'rgba(255, 99, 132, 1)',
+                    borderWidth: 2,
+                    fill: false,
+                    pointRadius: 0
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                x: {
+                    type: 'linear',
+                    position: 'bottom'
+                }
+            }
+        }
+    });
+}
+
+// Data Filtering
+let filterRules = [];
+const allColumns = {{ all_columns|tojson }};
+
+function populateFilterColumns() {
+    // This would be populated with actual column data
+    // For now, we'll use a simple structure
+}
+
+function addFilterRule() {
+    const ruleId = Date.now();
+    const ruleHtml = `
+        <div class="filter-rule" id="rule-${ruleId}">
+            <select class="form-control filter-column" onchange="updateFilterOptions(${ruleId})">
+                <option value="">Select column</option>
+                ${allColumns.map(col => `<option value="${col}">${col}</option>`).join('')}
+            </select>
+            <select class="form-control filter-type">
+                <option value="range">Range</option>
+                <option value="values">Values</option>
+                <option value="text">Text contains</option>
+            </select>
+            <div class="filter-value"></div>
+            <button class="btn btn-danger btn-sm" onclick="removeFilterRule(${ruleId})">Remove</button>
+        </div>
+    `;
+    
+    document.getElementById('filterRules').insertAdjacentHTML('beforeend', ruleHtml);
+}
+
+function removeFilterRule(ruleId) {
+    const rule = document.getElementById(`rule-${ruleId}`);
+    if (rule) {
+        rule.remove();
+    }
+}
+
+function updateFilterOptions(ruleId) {
+    const column = document.querySelector(`#rule-${ruleId} .filter-column`).value;
+    const type = document.querySelector(`#rule-${ruleId} .filter-type`).value;
+    const valueDiv = document.querySelector(`#rule-${ruleId} .filter-value`);
+    
+    let valueHtml = '';
+    
+    if (type === 'range') {
+        valueHtml = `
+            <input type="number" class="form-control" placeholder="Min" id="min-${ruleId}">
+            <input type="number" class="form-control" placeholder="Max" id="max-${ruleId}">
+        `;
+    } else if (type === 'values') {
+        valueHtml = `
+            <input type="text" class="form-control" placeholder="Comma-separated values" id="values-${ruleId}">
+        `;
+    } else if (type === 'text') {
+        valueHtml = `
+            <input type="text" class="form-control" placeholder="Search text" id="text-${ruleId}">
+        `;
+    }
+    
+    valueDiv.innerHTML = valueHtml;
+}
+
+function applyFilters() {
+    const rules = document.querySelectorAll('.filter-rule');
+    const filters = {};
+    
+    rules.forEach(rule => {
+        const column = rule.querySelector('.filter-column').value;
+        const type = rule.querySelector('.filter-type').value;
+        
+        if (!column) return;
+        
+        const filterConfig = { type };
+        
+        if (type === 'range') {
+            const min = rule.querySelector('input[placeholder="Min"]').value;
+            const max = rule.querySelector('input[placeholder="Max"]').value;
+            if (min) filterConfig.min = parseFloat(min);
+            if (max) filterConfig.max = parseFloat(max);
+        } else if (type === 'values') {
+            const values = rule.querySelector('input[placeholder="Comma-separated values"]').value;
+            if (values) {
+                filterConfig.values = values.split(',').map(v => v.trim());
+            }
+        } else if (type === 'text') {
+            const text = rule.querySelector('input[placeholder="Search text"]').value;
+            if (text) {
+                filterConfig.text = text;
+            }
+        }
+        
+        filters[column] = filterConfig;
+    });
+    
+    // Send filter request
+    fetch(`/dataset/${datasetId}/filter`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(filters)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.error) {
+            alert('Error: ' + data.error);
+            return;
+        }
+        
+        displayFilterResults(data);
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Error applying filters');
+    });
+}
+
+function displayFilterResults(data) {
+    document.getElementById('filterResults').style.display = 'block';
+    
+    // Update summary
+    document.getElementById('filterSummary').innerHTML = `
+        <strong>Results:</strong> ${data.total_rows} rows shown 
+        (${data.filtered_rows} rows filtered out)
+    `;
+    
+    // Build table
+    if (data.preview && data.preview.length > 0) {
+        const columns = Object.keys(data.preview[0]);
+        
+        // Build header
+        const headerHtml = columns.map(col => `<th>${col}</th>`).join('');
+        document.getElementById('filteredTableHead').innerHTML = `<tr>${headerHtml}</tr>`;
+        
+        // Build body
+        const bodyHtml = data.preview.map(row => {
+            const cells = columns.map(col => `<td>${row[col] || ''}</td>`).join('');
+            return `<tr>${cells}</tr>`;
+        }).join('');
+        
+        document.getElementById('filteredTableBody').innerHTML = bodyHtml;
+    }
+}
+
+function clearFilters() {
+    document.getElementById('filterRules').innerHTML = '';
+    document.getElementById('filterResults').style.display = 'none';
+    filterRules = [];
+}
+</script>
+{% endblock %}
